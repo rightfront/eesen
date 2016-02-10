@@ -61,11 +61,13 @@ namespace eesen {
  * (before first allocation in gpucompute), or not at all (default to CPU).
  *
  */
-void CuDevice::SelectGpuId(std::string use_gpu) {
+void CuDevice::SelectGpuId(std::string use_gpu,int32 job_id) {
   // Possible modes  
-  if (use_gpu != "yes" && use_gpu != "no" && use_gpu != "optional" && use_gpu != "wait") {
-    KALDI_ERR << "Please choose : --use-gpu=yes|no|optional|wait, passed '" << use_gpu << "'";
+  if (use_gpu != "yes" && use_gpu != "no" && use_gpu != "optional" && use_gpu != "wait" && use_gpu != "specify") {
+    KALDI_ERR << "Please choose : --use-gpu=yes|no|optional|wait|specify, passed '" << use_gpu << "'";
   }
+
+  KALDI_LOG << "use_gpu set to " <<use_gpu;
  
   // Make sure this function is not called twice!
   if (Enabled()) {
@@ -81,6 +83,7 @@ void CuDevice::SelectGpuId(std::string use_gpu) {
   // Check that we have a gpu available
   int32 n_gpu = 0;
   cudaGetDeviceCount(&n_gpu);
+  KALDI_LOG << "Found " << n_gpu << " GPUs.";
   if (n_gpu == 0) {
     if (use_gpu == "yes" || use_gpu == "wait") {
       KALDI_ERR << "No CUDA GPU detected!";
@@ -88,6 +91,25 @@ void CuDevice::SelectGpuId(std::string use_gpu) {
     if (use_gpu == "optional") {
       KALDI_WARN << "Running on CPU!!! No CUDA GPU detected...";
       return;
+    }
+  }
+  if (n_gpu < job_id)
+  {
+    KALDI_ERR << "Too many jobs, only "<< n_gpu << " GPUs available!!";
+    return;
+  } 
+
+  if (use_gpu == "specify") 
+  {
+    KALDI_LOG << "Trying to select GPU with ID " << job_id -1; 
+    if(SelectGpuIdManual(job_id-1))  
+    {
+      FinalizeActiveGpu();
+      cudaGetLastError();
+      return;
+    } else 
+    {
+      KALDI_ERR << "Error acquiring GPU with ID " << job_id - 1 << " check settings.";
     }
   }
 
@@ -99,7 +121,9 @@ void CuDevice::SelectGpuId(std::string use_gpu) {
   cudaError_t e;
   e = cudaThreadSynchronize(); //<< CUDA context gets created here.
 
-  if (use_gpu != "wait") {
+  KALDI_LOG << "cudaThreadSynchronize() returned " << e;
+
+  if (use_gpu != "wait" && use_gpu != "specify") {
     if (e != cudaSuccess) {
       // So far no we don't have context, sleep a bit and retry.
       int32 sec_sleep = (use_gpu == "yes" ? 20 : 2);
@@ -119,50 +143,72 @@ void CuDevice::SelectGpuId(std::string use_gpu) {
       }
     }
   } else {
-    int32 num_times = 0;
-    BaseFloat wait_time = 0.0;
-    while (e != cudaSuccess) {
-      int32 sec_sleep = 5;
-      if (num_times == 0)
-        KALDI_WARN << "Will try again indefinitely every " << sec_sleep 
-                   << " seconds to get a GPU.";
-      num_times++;
-      wait_time += sec_sleep;
-      sleep(sec_sleep);
-      cudaGetLastError(); // reset the error state    
-      e = cudaThreadSynchronize();
-    }
+    if (use_gpu == "wait") {
+      int32 num_times = 0;
+      BaseFloat wait_time = 0.0;
+      while (e != cudaSuccess) {
+        int32 sec_sleep = 5;
+        if (num_times == 0)
+          KALDI_WARN << "Will try again indefinitely every " << sec_sleep 
+                     << " seconds to get a GPU.";
+        if (num_times != 0) KALDI_WARN << "Attempt # "<< num_times << " to acquire GPU.";
+        num_times++;
+        wait_time += sec_sleep;
+        sleep(sec_sleep);
+        cudaGetLastError(); // reset the error state    
+        e = cudaThreadSynchronize();
+        KALDI_LOG << "cudaThreadSynchronize response is " << e;
+      }
 
-    KALDI_WARN << "Waited " << wait_time
+      KALDI_WARN << "Waited " << wait_time
                << " seconds before creating CUDA context";
+    }
   }
 
   // Re-assure we have the context
   KALDI_ASSERT(cudaSuccess == cudaThreadSynchronize());
 
   // Check if the machine use compute exclusive mode 
-  if (IsComputeExclusive()) {
+  if (IsComputeExclusive() && use_gpu != "specify") 
+  {
     FinalizeActiveGpu();
+    cudaGetLastError();
     return;
-  } else {
+  } else
+  {
     // Or suggest to use compute exclusive mode
-    if(n_gpu > 1) { 
+    if(n_gpu > 1 && use_gpu != "specify") { 
       KALDI_WARN << "Suggestion: use 'nvidia-smi -c 1' to set compute exclusive mode";
     }
     // And select the GPU according to proportion of free memory
-    if(SelectGpuIdAuto()) {
+    if(SelectGpuIdAuto()) 
+    {
       FinalizeActiveGpu();
       return;
-    } else { 
+    } else 
+    { 
       // Could not get GPU, after prevously having the CUDA context?
       // Strange but not impossible...
-      if (use_gpu == "yes") {
+      if (use_gpu == "yes") 
+      {
         KALDI_ERR << "Error acquiring GPU.";
       }
-      if (use_gpu == "optional") {
+      if (use_gpu == "optional") 
+      {
         KALDI_WARN << "Running on CPU!!! Error acquiring GPU.";
         return;
       }
+    }
+  }
+  if (use_gpu == "specify")
+  {
+    if(SelectGpuIdManual(job_id-1))
+    {
+      FinalizeActiveGpu();
+      return;
+    } else
+    {
+      KALDI_ERR << "Error acquiring GPU with ID " << job_id - 1 << " check settings.";
     }
   }
 }
@@ -200,7 +246,79 @@ void CuDevice::FinalizeActiveGpu() {
   return;
 }
 
+bool CuDevice::SelectGpuIdManual(int32 gpu_id) {
+  // Check that we have at least one gpu
+  int32 n_gpu = 0;
+  cudaGetDeviceCount(&n_gpu);
+  if(n_gpu == 0) {
+    KALDI_WARN << "No CUDA devices found";
+    return false;
+  }
+  
+  // The GPU is selected according to maximal free memory ratio
+  std::vector<float> free_mem_ratio(n_gpu+1, 0.0);
+  // Get ratios of memory use, if possible
+  KALDI_LOG << "Selecting from " << n_gpu << " GPUs";
+  for(int32 n = 0; n < n_gpu; n++) {
+    int32 ret = cudaSetDevice(n);
+    switch(ret) {
+      case cudaSuccess : {
+        //create the CUDA context for the thread
+        cudaThreadSynchronize(); //deprecated, but for legacy not cudaDeviceSynchronize
+        //get GPU name
+        char name[128];
+        DeviceGetName(name,128,n);
+        //get GPU memory stats
+        int64 free, total;
+        std::string mem_stats;
+        mem_stats = GetFreeMemory(&free, &total);
+        //log
+        KALDI_LOG << "cudaSetDevice(" << n << "): "
+                  << name << "\t" << mem_stats;
+        //store the free/total ratio
+        free_mem_ratio[n] = free/(float)total;
+        //destroy the CUDA context for the thread
+        cudaThreadExit(); //deprecated, but for legacy reason not cudaDeviceReset
+      } break;
 
+#if (CUDA_VERSION > 3020)
+      case cudaErrorDeviceAlreadyInUse :
+        KALDI_LOG << "cudaSetDevice(" << n << "): "
+                  << "Device cannot be accessed, used EXCLUSIVE-THREAD mode...";
+        break;
+#endif
+      case cudaErrorInvalidDevice :
+        KALDI_LOG << "cudaSetDevice(" << n << "): "
+                  << "Device cannot be accessed, not a VALID CUDA device!";
+        break;
+      default :
+        KALDI_LOG << "cudaSetDevice(" << n << "): "
+                  << "returned " << ret << ", " 
+                  << cudaGetErrorString((cudaError_t)ret);
+    }
+  }
+
+  //finally select the GPU
+  KALDI_LOG << "Selected device: " << gpu_id << " (manually)";
+  CU_SAFE_CALL(cudaSetDevice(gpu_id));
+  //create the context
+  cudaError_t e;
+  e = cudaThreadSynchronize(); //deprecated, but for legacy not cudaDeviceSynchronize
+  if(e != cudaSuccess) {
+    // So far no we don't have context, sleep a bit and retry.
+    int32 sec_sleep = 10;
+    KALDI_WARN << "Will try again to get a GPU after " << sec_sleep
+               << " seconds.";
+    sleep(sec_sleep);
+    cudaGetLastError(); // reset the error state
+    e = cudaThreadSynchronize(); //<< 2nd trial to get CUDA context.
+    if (e != cudaSuccess){
+      KALDI_WARN << "Failed to create CUDA context on a GPU.";
+    return false;
+    }
+  }
+  return true;
+}
 bool CuDevice::DoublePrecisionSupported() {
   if (!Enabled()) return true;
   return properties_.major > 1 || (properties_.major == 1 && properties_.minor >= 3);
@@ -655,11 +773,15 @@ void* CuAllocator::MallocInternal(size_t row_bytes,
       size_t pitch;
       int32 ret = cudaMallocPitch(&ans, &pitch, row_bytes, num_rows);
       if (ret != 0) { // allocation failed...
+        device_->PrintMemoryUsage();
+	int32 sleep_sec =10;
         KALDI_WARN << "Allocation of " << num_rows << " rows, each of size "
                    << row_bytes << " bytes failed,  releasing cached "
-                   << "memory and retrying.";
+                   << "memory and retrying in " << sleep_sec << " seconds.";
         cudaGetLastError(); // reset the error state
         ReleaseAllCachedMemory();
+        device_->PrintMemoryUsage();
+        sleep(sleep_sec);
         ret = cudaMallocPitch(&ans, &pitch, row_bytes, num_rows);
         if (ret != 0) {
           KALDI_WARN << "Allocation failed for the second time.    Printing "

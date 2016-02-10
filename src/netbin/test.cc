@@ -1,4 +1,4 @@
-// netbin/train-ctc-parallel.cc
+// netbin/test.cc
 
 // Copyright 2015   Yajie Miao, Hang Su
 
