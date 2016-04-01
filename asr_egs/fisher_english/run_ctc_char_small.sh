@@ -2,7 +2,7 @@
 
 . ./cmd.sh ## You'll want to change cmd.sh to something that will work on your system.
            ## This relates to the queue.
-stage=3
+stage=4
 #wsj0=/path/to/LDC93S6B
 #wsj1=/path/to/LDC94S13B
 fisher=/home/ec2-user/SpeakEasy/LDC_Data
@@ -73,16 +73,17 @@ if [ $stage -le 3 ]; then
   echo "                    FBank Feature Generation                       "
   echo =====================================================================
 
+  ##probably need to split off an evaluation set also, wsj_data_prep has this, fisher_data_prep looks like it doesn't
+  ## might also need 'dev' set?  right now just commented out...
+
   # Split the whole training data into training (95%) and cross-validation (5%) sets
   utils/subset_data_dir_tr_cv.sh --cv-spk-percent 5 data/train_all data/train_tr95 data/train_cv05 || exit 1;
 
-  #pick the first 60k utterances out of the training set (full set seems to cause memory errors, will need to investigate)
-  utils/subset_data_dir --first 60000 data/train_tr95 data/train_60k;
+  #pick the first 600k utterances out of the training set (full set seems to cause memory errors, will need to investigate)
+  utils/subset_data_dir.sh --first data/train_tr95 600000 data/train_600k;
 
-  #split off some utterances for test/eval
-  utils/subset_data_dir_tr_cv.sh --cv-spk-percent 15 data/train_60k data/train_tr80 data/test_deval;
+  utils/subset_data_dir_tr_cv.sh --cv-spk-percent 20 data/train_600k data/train_tr80 data/test_deval;
 
-  #split the test/eval utterances in two
   utils/subset_data_dir_tr_cv.sh --cv-spk-percent 50 data/test_deval data/test_dev93 data/test_eval92;
 
   # Generate the fbank features; by default 40-dimensional fbanks on each frame
@@ -129,7 +130,7 @@ if [ $stage -le 4 ]; then
     data/train_cv05/text "<unk>" "<space>" | gzip -c - > $dir/labels.cv.gz
 
   # Train the network with CTC. Refer to the script for details about the arguments
-  steps/train_ctc_parallel_h.sh --add-deltas true --num-sequence 15 --frame-num-limit 15000 \
+  steps/train_ctc_parallel.sh --add-deltas true --num-sequence 10 --frame-num-limit 15000 \
     --learn-rate 0.00004 --report-step 1000 \
      data/train_tr80 data/train_cv05 $dir || exit 1;
 ## try to train on small data set to debug memory error...

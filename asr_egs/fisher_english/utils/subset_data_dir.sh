@@ -161,7 +161,7 @@ elif $perspk; then
 else
   if [ $numutt -gt `cat $srcdir/feats.scp | wc -l` ]; then
     echo "subset_data_dir.sh: cannot subset to more utterances than you originally had."
-    exit 1;
+    #exit 1;
   fi 
   mkdir -p $destdir || exit 1;
 

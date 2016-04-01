@@ -64,6 +64,7 @@ cat $cleantext | awk '{for(n=2;n<=NF;n++) print $n; }' | \
 cat $dir/unigram.counts  | awk '{print $2}' | get_word_map.pl "<s>" "</s>" "<unk>" > $dir/word_map \
    || exit 1;
 
+## MD: The below doesn't seem to be properly ignoring the utterance-id
 # note: ignore 1st field of train.txt, it's the utterance-id.
 cat $cleantext | awk -v wmap=$dir/word_map 'BEGIN{while((getline<wmap)>0)map[$1]=$2;}
   { for(n=2;n<=NF;n++) { printf map[$n]; if(n<NF){ printf " "; } else { print ""; }}}' | gzip -c >$dir/train.gz \
