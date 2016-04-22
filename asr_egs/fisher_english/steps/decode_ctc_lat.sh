@@ -19,7 +19,9 @@ lattice_beam=8.0
 max_mem=50000000 # approx. limit to memory consumption during minimization in bytes
 
 skip_scoring=false # whether to skip WER scoring
-scoring_opts="--min-acwt 5 --max-acwt 10 --acwt-factor 0.1"
+##below causes errors, doesn't match with local/score.sh options...
+#scoring_opts="--min-acwt 5 --max-acwt 10 --acwt-factor 0.1"
+scoring_opts=""
 
 # feature configurations; will be read from the training dir if not provided
 norm_vars=

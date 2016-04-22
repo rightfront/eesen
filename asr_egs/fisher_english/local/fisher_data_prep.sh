@@ -49,7 +49,7 @@ mkdir -p data/local/data/links || exit 1;
 #  fe_03_p1_sph4  fe_03_p1_sph6  fe_03_p1_tran  fe_03_p2_sph2  fe_03_p2_sph4 \
 #  fe_03_p2_sph6  fe_03_p2_tran; do
 for subdir in fe_03_p2_sph1 fe_03_p2_sph2 fe_03_p2_sph3 fe_03_p2_sph4 \
-  fe_03_p2_sph5 fe_03_p2_sph6 fe_03_p2_sph6 fe_03_p2_sph7 fe_03_p2_tran; do
+  fe_03_p2_sph5 fe_03_p2_sph6 fe_03_p2_sph7 fe_03_p2_tran; do
   
   found_subdir=false
   for dir in $*; do
@@ -88,9 +88,9 @@ fi
 
 if [ $stage -le 0 ]; then
 
-  find $links/fe_03_p1_tran/data $links/fe_03_p2_tran/data -name '*.txt'  > $tmpdir/transcripts.flist
+  find $links/fe_03_p2_tran/data -name '*.txt'  > $tmpdir/transcripts.flist
 
-  for dir in fe_03_p{1,2}_sph{1,2,3,4,5,6,7}; do
+  for dir in fe_03_p2_sph{1,2,3,4,5,6,7}; do
     find $links/$dir/ -name '*.sph'
   done > $tmpdir/sph.flist
 

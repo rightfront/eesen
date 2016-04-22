@@ -25,8 +25,9 @@ mkdir -p $dir
 
 # Get the CMU dictionary. We specify the version 11745 because this is something we used. You can 
 # of course remove "-r 11745" to get the latest version.
-## changed to 13169 to match with fisher_english dicts 
-svn co -r 13169 https://svn.code.sf.net/p/cmusphinx/code/trunk/cmudict $dir/cmudict || exit 1;
+## changed to 13169 to match with fisher_english dicts
+## also changed to pull proxy info from environment - requires they be set (I modified proxies.sh) 
+svn co --config-option servers:global:http-proxy-username=$http_proxy_username --config-option servers:global:http-proxy-password=$http_proxy_password  -r 13169 https://svn.code.sf.net/p/cmusphinx/code/trunk/cmudict $dir
 
 # Raw dictionary preparation.
 grep -v ';;;' $dir/cmudict/cmudict.0.7a | \
