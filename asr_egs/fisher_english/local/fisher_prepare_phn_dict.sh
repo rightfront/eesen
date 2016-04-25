@@ -27,7 +27,7 @@ mkdir -p $dir
 # of course remove "-r 11745" to get the latest version.
 ## changed to 13169 to match with fisher_english dicts
 ## also changed to pull proxy info from environment - requires they be set (I modified proxies.sh) 
-svn co --config-option servers:global:http-proxy-username=$http_proxy_username --config-option servers:global:http-proxy-password=$http_proxy_password  -r 13169 https://svn.code.sf.net/p/cmusphinx/code/trunk/cmudict $dir
+svn co --config-option servers:global:http-proxy-username=$http_proxy_username --config-option servers:global:http-proxy-password=$http_proxy_password  -r 13169 https://svn.code.sf.net/p/cmusphinx/code/trunk/cmudict $dir/cmudict
 
 # Raw dictionary preparation.
 grep -v ';;;' $dir/cmudict/cmudict.0.7a | \

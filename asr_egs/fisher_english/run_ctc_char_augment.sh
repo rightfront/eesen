@@ -2,7 +2,7 @@
 
 . ./cmd.sh ## You'll want to change cmd.sh to something that will work on your system.
            ## This relates to the queue.
-stage=1
+stage=4
 #wsj0=/path/to/LDC93S6B
 #wsj1=/path/to/LDC94S13B
 fisher=/home/ec2-user/SpeakEasy/LDC_Data
