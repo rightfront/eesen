@@ -187,6 +187,8 @@ for iter in $(seq $start_epoch_num $max_iters); do
     echo $halving > $dir/.halving
     echo $learn_rate > $dir/.lrate
     ### could do something here to write to S3?
+    source /home/ec2-user/proxies.sh
+    proxy_off
     aws s3 cp $dir s3://cdi-speakeasy/eesen-models/$dir --recursive
 done
 
@@ -194,4 +196,6 @@ done
 format-to-nonparallel $dir/nnet/nnet.iter${iter} $dir/final.nnet >& $dir/log/model_to_nonparal.log || exit 1;
 
 echo "Training succeeded. The final model $dir/final.nnet"
+source /home/ec2-user/proxies.sh
+proxy_off
 aws s3 cp $dir/final.nnet s3://cdi-speakeasy/eesen-models/$dir
